@@ -11,6 +11,7 @@ export class AudioEngine {
   private currentBeat: number = 0;
   private nextNoteTime: number = 0; // When the next note is due (in AudioContext time)
   private timerID: number | null = null;
+  private manualOffset: number = 0; // In milliseconds
   
   // getSyncTime returns the current time in the Master's reference frame (in ms)
   private getSyncTime: () => number;
@@ -29,6 +30,10 @@ export class AudioEngine {
     if (this.isPlaying) {
       this.resyncToMaster();
     }
+  }
+
+  public setManualOffset(offset: number) {
+    this.manualOffset = offset;
   }
 
   public start() {
@@ -96,9 +101,10 @@ export class AudioEngine {
     gainNode.gain.linearRampToValueAtTime(1, time + 0.002);
     gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
     
-    // Hardware latency compensation
+    // Hardware latency compensation and manual offset
     const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
-    const playTime = time - latency; // shift schedule slightly back if hardware delays
+    const manualOffsetSec = this.manualOffset / 1000.0;
+    const playTime = time - latency + manualOffsetSec; // shift schedule slightly based on latency and manual offset
     
     osc.start(playTime > 0 ? playTime : 0);
     osc.stop(playTime > 0 ? playTime + 0.1 : 0.1);
