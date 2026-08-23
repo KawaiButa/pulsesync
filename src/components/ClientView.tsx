@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { SyncEngine, SyncState } from '../lib/SyncEngine';
 import { AudioEngine } from '../lib/AudioEngine';
 import { ArrowLeft, Wifi, Activity } from 'lucide-react';
+import { BeatVisualizer } from './BeatVisualizer';
 
 export function ClientView({ onBack }: { onBack: () => void }) {
   const [masterId, setMasterId] = useState('');
@@ -10,6 +11,7 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   const [syncState, setSyncState] = useState<SyncState | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
   const [rtt, setRtt] = useState(0);
+  const [manualOffset, setManualOffset] = useState(0);
 
   const syncRef = useRef<SyncEngine | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
@@ -22,6 +24,12 @@ export function ClientView({ onBack }: { onBack: () => void }) {
       hasAudioContext.current = true;
     }
   };
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.setManualOffset(manualOffset);
+    }
+  }, [manualOffset]);
 
   useEffect(() => {
     const sync = new SyncEngine();
@@ -115,14 +123,41 @@ export function ClientView({ onBack }: { onBack: () => void }) {
               <div className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">
                 Current BPM
               </div>
-              <div className="text-8xl font-black mb-8 tabular-nums tracking-tighter text-white">
+              <div className="text-8xl font-black mb-4 tabular-nums tracking-tighter text-white">
                 {syncState?.bpm || '--'}
               </div>
+
+              <BeatVisualizer 
+                isPlaying={syncState?.isPlaying || false} 
+                masterT0={syncState?.masterT0 || 0} 
+                bpm={syncState?.bpm || 120} 
+                beatsPerMeasure={syncState?.beatsPerMeasure || 4} 
+                getSyncTime={() => (syncRef.current ? syncRef.current.getSynchronizedTime() - manualOffset : performance.now())} 
+              />
 
               <div className="flex items-center text-gray-400">
                 <Activity className={`w-6 h-6 mr-2 ${syncState?.isPlaying ? 'text-purple-400' : ''}`} />
                 {syncState?.isPlaying ? 'Playing in Sync' : 'Waiting for Master...'}
               </div>
+            </div>
+
+            <div className="glass rounded-3xl p-6">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
+                Fine-tune Sync (Offset)
+              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-500">Earlier</span>
+                <span className="text-lg font-mono text-purple-300 font-bold">{manualOffset > 0 ? '+' : ''}{manualOffset}ms</span>
+                <span className="text-xs text-gray-500">Later</span>
+              </div>
+              <input 
+                type="range" 
+                min="-200" 
+                max="200" 
+                value={manualOffset}
+                onChange={(e) => setManualOffset(parseInt(e.target.value, 10))}
+                className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+              />
             </div>
           </div>
         )}

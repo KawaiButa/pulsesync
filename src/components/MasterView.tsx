@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { SyncEngine } from '../lib/SyncEngine';
 import { AudioEngine } from '../lib/AudioEngine';
+import { BeatVisualizer } from './BeatVisualizer';
 import { Play, Square, Users, ArrowLeft, Radio } from 'lucide-react';
 
 export function MasterView({ onBack }: { onBack: () => void }) {
@@ -8,6 +9,7 @@ export function MasterView({ onBack }: { onBack: () => void }) {
   const [connections, setConnections] = useState(0);
   const [bpm, setBpm] = useState(120);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [masterT0, setMasterT0] = useState(0);
   
   const syncRef = useRef<SyncEngine | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
@@ -35,6 +37,7 @@ export function MasterView({ onBack }: { onBack: () => void }) {
     const masterT0 = performance.now() + 100; // start 100ms in future
     
     setIsPlaying(nextIsPlaying);
+    setMasterT0(masterT0);
     
     const state = {
       bpm,
@@ -64,6 +67,7 @@ export function MasterView({ onBack }: { onBack: () => void }) {
         isPlaying: true,
         masterT0: performance.now() + 100
       };
+      setMasterT0(state.masterT0);
       syncRef.current.broadcastState(state);
       audioRef.current.setParams(state.masterT0, newBpm, 4);
       audioRef.current.start(); // re-syncs
@@ -97,9 +101,17 @@ export function MasterView({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="glass rounded-3xl p-8 flex flex-col items-center text-center">
-          <div className="text-7xl font-black mb-8 tabular-nums tracking-tighter">
+          <div className="text-7xl font-black mb-2 tabular-nums tracking-tighter">
             {bpm}
           </div>
+          
+          <BeatVisualizer 
+            isPlaying={isPlaying} 
+            masterT0={masterT0} 
+            bpm={bpm} 
+            beatsPerMeasure={4} 
+            getSyncTime={() => performance.now()} 
+          />
           
           <input 
             type="range" 
