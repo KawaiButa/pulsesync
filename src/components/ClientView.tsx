@@ -12,6 +12,7 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   const [clockOffset, setClockOffset] = useState(0);
   const [rtt, setRtt] = useState(0);
   const [manualOffset, setManualOffset] = useState(0);
+  const [soundType, setSoundType] = useState<'classic' | 'deep' | 'sharp'>('classic');
 
   const syncRef = useRef<SyncEngine | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
@@ -28,8 +29,9 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.setManualOffset(manualOffset);
+      audioRef.current.setSoundType(soundType);
     }
-  }, [manualOffset]);
+  }, [manualOffset, soundType]);
 
   useEffect(() => {
     const sync = new SyncEngine();
@@ -152,12 +154,32 @@ export function ClientView({ onBack }: { onBack: () => void }) {
               </div>
               <input 
                 type="range" 
-                min="-200" 
-                max="200" 
+                min="-500" 
+                max="500" 
                 value={manualOffset}
                 onChange={(e) => setManualOffset(parseInt(e.target.value, 10))}
                 className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
               />
+            </div>
+
+            <div className="glass rounded-3xl p-6">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
+                Sound Profile
+              </h3>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setSoundType('classic')}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${soundType === 'classic' ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                >Classic</button>
+                <button 
+                  onClick={() => setSoundType('deep')}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${soundType === 'deep' ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                >Deep</button>
+                <button 
+                  onClick={() => setSoundType('sharp')}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${soundType === 'sharp' ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                >Sharp</button>
+              </div>
             </div>
           </div>
         )}

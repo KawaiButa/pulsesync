@@ -12,6 +12,7 @@ export class AudioEngine {
   private nextNoteTime: number = 0; // When the next note is due (in AudioContext time)
   private timerID: number | null = null;
   private manualOffset: number = 0; // In milliseconds
+  private soundType: 'classic' | 'deep' | 'sharp' = 'classic';
   
   // getSyncTime returns the current time in the Master's reference frame (in ms)
   private getSyncTime: () => number;
@@ -34,6 +35,10 @@ export class AudioEngine {
 
   public setManualOffset(offset: number) {
     this.manualOffset = offset;
+  }
+
+  public setSoundType(type: 'classic' | 'deep' | 'sharp') {
+    this.soundType = type;
   }
 
   public start() {
@@ -93,21 +98,30 @@ export class AudioEngine {
     osc.connect(gainNode);
     gainNode.connect(this.ctx.destination);
     
-    osc.type = isAccent ? 'square' : 'sine';
-    osc.frequency.value = isAccent ? 1200 : 800; // Higher pitch for accent
-    
-    // Envelope to make a percussive "click"
-    gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(1, time + 0.002);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    if (this.soundType === 'classic') {
+      osc.type = isAccent ? 'square' : 'sine';
+      osc.frequency.value = isAccent ? 1200 : 800; // Higher pitch for accent
+    } else if (this.soundType === 'deep') {
+      osc.type = 'sine';
+      osc.frequency.value = isAccent ? 400 : 200;
+    } else if (this.soundType === 'sharp') {
+      osc.type = isAccent ? 'sawtooth' : 'triangle';
+      osc.frequency.value = isAccent ? 1500 : 1000;
+    }
     
     // Hardware latency compensation and manual offset
     const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
     const manualOffsetSec = this.manualOffset / 1000.0;
     const playTime = time - latency + manualOffsetSec; // shift schedule slightly based on latency and manual offset
+    const safePlayTime = playTime > 0 ? playTime : 0;
     
-    osc.start(playTime > 0 ? playTime : 0);
-    osc.stop(playTime > 0 ? playTime + 0.1 : 0.1);
+    // Envelope to make a percussive "click"
+    gainNode.gain.setValueAtTime(0, safePlayTime);
+    gainNode.gain.linearRampToValueAtTime(1, safePlayTime + 0.002);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, safePlayTime + 0.1);
+    
+    osc.start(safePlayTime);
+    osc.stop(safePlayTime + 0.1);
   }
 
   private scheduler = () => {
