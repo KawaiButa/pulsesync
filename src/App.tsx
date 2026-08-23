@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MasterView } from './components/MasterView';
 import { ClientView } from './components/ClientView';
 import { Activity } from 'lucide-react';
