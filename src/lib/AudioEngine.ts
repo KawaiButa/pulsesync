@@ -13,6 +13,8 @@ export class AudioEngine {
   private timerID: number | null = null;
   private manualOffset: number = 0; // In milliseconds
   private soundType: 'classic' | 'deep' | 'sharp' = 'classic';
+  private volume: number = 1.0;
+  private isMuted: boolean = false;
   
   // getSyncTime returns the current time in the Master's reference frame (in ms)
   private getSyncTime: () => number;
@@ -39,6 +41,14 @@ export class AudioEngine {
 
   public setSoundType(type: 'classic' | 'deep' | 'sharp') {
     this.soundType = type;
+  }
+
+  public setVolume(vol: number) {
+    this.volume = vol;
+  }
+
+  public setMuted(muted: boolean) {
+    this.isMuted = muted;
   }
 
   public start() {
@@ -117,9 +127,15 @@ export class AudioEngine {
     const safePlayTime = playTime > now ? playTime : now;
     
     // Envelope to make a percussive "click"
+    const targetVolume = this.isMuted ? 0 : this.volume;
+    
     gainNode.gain.setValueAtTime(0, safePlayTime);
-    gainNode.gain.linearRampToValueAtTime(1, safePlayTime + 0.002);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, safePlayTime + 0.1);
+    if (targetVolume > 0) {
+      gainNode.gain.linearRampToValueAtTime(targetVolume, safePlayTime + 0.002);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, safePlayTime + 0.1);
+    } else {
+      gainNode.gain.setValueAtTime(0, safePlayTime + 0.1);
+    }
     
     osc.start(safePlayTime);
     osc.stop(safePlayTime + 0.1);

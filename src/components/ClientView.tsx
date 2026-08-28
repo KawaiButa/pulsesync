@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { SyncEngine, SyncState } from '../lib/SyncEngine';
 import { AudioEngine } from '../lib/AudioEngine';
-import { ArrowLeft, Wifi, Activity } from 'lucide-react';
+import { ArrowLeft, Wifi, Activity, Minus, Plus, Volume2, VolumeX, MousePointerClick } from 'lucide-react';
 import { BeatVisualizer } from './BeatVisualizer';
 
 export function ClientView({ onBack }: { onBack: () => void }) {
@@ -11,12 +11,17 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   const [syncState, setSyncState] = useState<SyncState | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
   const [rtt, setRtt] = useState(0);
-  const [manualOffset, setManualOffset] = useState(0);
+  const [manualOffset, setManualOffset] = useState<number | string>(0);
   const [soundType, setSoundType] = useState<'classic' | 'deep' | 'sharp'>('classic');
+  const [volume, setVolume] = useState(1.0);
+  const [isMuted, setIsMuted] = useState(false);
 
   const syncRef = useRef<SyncEngine | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
   const hasAudioContext = useRef(false);
+  
+  const tapHistoryRef = useRef<number[]>([]);
+  const lastTapTimeRef = useRef<number>(0);
 
   // Auto-init audio context on user interaction
   const initAudio = () => {
@@ -28,10 +33,12 @@ export function ClientView({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.setManualOffset(manualOffset);
+      audioRef.current.setManualOffset(Number(manualOffset) || 0);
       audioRef.current.setSoundType(soundType);
+      audioRef.current.setVolume(volume);
+      audioRef.current.setMuted(isMuted);
     }
-  }, [manualOffset, soundType]);
+  }, [manualOffset, soundType, volume, isMuted]);
 
   useEffect(() => {
     const sync = new SyncEngine();
@@ -71,6 +78,37 @@ export function ClientView({ onBack }: { onBack: () => void }) {
     setIsConnecting(true);
     initAudio();
     syncRef.current.initClient(masterId.trim());
+  };
+
+  const handleTapToSync = () => {
+    if (!syncState || !syncRef.current) return;
+    
+    const now = performance.now();
+    if (now - lastTapTimeRef.current > 2000) {
+      // More than 2 seconds since last tap, reset history
+      tapHistoryRef.current = [];
+    }
+    lastTapTimeRef.current = now;
+
+    const syncTime = syncRef.current.getSynchronizedTime();
+    const msPerBeat = (60.0 / syncState.bpm) * 1000;
+    const elapsed = syncTime - syncState.masterT0;
+    const N = Math.round(elapsed / msPerBeat);
+    const idealBeatTime = syncState.masterT0 + N * msPerBeat;
+    
+    const delta = syncTime - idealBeatTime;
+    
+    tapHistoryRef.current.push(delta);
+    if (tapHistoryRef.current.length > 8) {
+      tapHistoryRef.current.shift(); // keep last 8 taps
+    }
+    
+    // Calculate average
+    const avgDelta = tapHistoryRef.current.reduce((a, b) => a + b, 0) / tapHistoryRef.current.length;
+    
+    // Update offset (clamp to -500 to 500)
+    const newOffset = Math.max(-500, Math.min(500, Math.round(avgDelta)));
+    setManualOffset(newOffset);
   };
 
   return (
@@ -134,7 +172,7 @@ export function ClientView({ onBack }: { onBack: () => void }) {
                 masterT0={syncState?.masterT0 || 0} 
                 bpm={syncState?.bpm || 120} 
                 beatsPerMeasure={syncState?.beatsPerMeasure || 4} 
-                getSyncTime={() => (syncRef.current ? syncRef.current.getSynchronizedTime() - manualOffset : performance.now())} 
+                getSyncTime={() => (syncRef.current ? syncRef.current.getSynchronizedTime() - (Number(manualOffset) || 0) : performance.now())} 
               />
 
               <div className="flex items-center text-gray-400">
@@ -147,18 +185,58 @@ export function ClientView({ onBack }: { onBack: () => void }) {
               <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
                 Fine-tune Sync (Offset)
               </h3>
+              
+              <button
+                onClick={handleTapToSync}
+                className="w-full bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-xl py-3 font-bold mb-6 transition-all flex items-center justify-center active:scale-95 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+              >
+                <MousePointerClick className="w-5 h-5 mr-2" />
+                Tap to Sync with Master
+              </button>
+
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-500">Earlier</span>
-                <span className="text-lg font-mono text-purple-300 font-bold">{manualOffset > 0 ? '+' : ''}{manualOffset}ms</span>
-                <span className="text-xs text-gray-500">Later</span>
+                <span className="text-xs text-gray-500 w-12">Earlier</span>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setManualOffset(Math.max(-500, (Number(manualOffset) || 0) - 1))}
+                    className="p-1 bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-center">
+                    <span className="text-lg font-mono text-purple-300 font-bold mr-1 w-4 text-right">{(Number(manualOffset) || 0) > 0 ? '+' : ''}</span>
+                    <input 
+                      type="text"
+                      value={manualOffset}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || val === '-') {
+                          setManualOffset(val);
+                        } else {
+                          const num = parseInt(val, 10);
+                          if (!isNaN(num)) setManualOffset(Math.max(-500, Math.min(500, num)));
+                        }
+                      }}
+                      className="w-16 bg-black/50 border border-white/10 rounded px-2 py-1 text-lg font-mono text-center focus:outline-none focus:border-purple-500"
+                    />
+                    <span className="text-lg font-mono text-purple-300 font-bold ml-1 w-6">ms</span>
+                  </div>
+                  <button 
+                    onClick={() => setManualOffset(Math.min(500, (Number(manualOffset) || 0) + 1))}
+                    className="p-1 bg-gray-800 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                <span className="text-xs text-gray-500 w-12 text-right">Later</span>
               </div>
               <input 
                 type="range" 
                 min="-500" 
                 max="500" 
-                value={manualOffset}
+                value={Number(manualOffset) || 0}
                 onChange={(e) => setManualOffset(parseInt(e.target.value, 10))}
-                className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer mt-4"
               />
             </div>
 
@@ -179,6 +257,32 @@ export function ClientView({ onBack }: { onBack: () => void }) {
                   onClick={() => setSoundType('sharp')}
                   className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${soundType === 'sharp' ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
                 >Sharp</button>
+              </div>
+            </div>
+
+            <div className="glass rounded-3xl p-6">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
+                Client Volume
+              </h3>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsMuted(!isMuted)}
+                  className={`p-2 rounded-lg transition-colors ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+                >
+                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                </button>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    setVolume(parseFloat(e.target.value));
+                    if (isMuted && parseFloat(e.target.value) > 0) setIsMuted(false);
+                  }}
+                  className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                />
               </div>
             </div>
           </div>

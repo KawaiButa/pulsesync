@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { SyncEngine } from '../lib/SyncEngine';
 import { AudioEngine } from '../lib/AudioEngine';
 import { BeatVisualizer } from './BeatVisualizer';
-import { Play, Square, Users, ArrowLeft, Radio } from 'lucide-react';
+import { Play, Square, Users, ArrowLeft, Radio, Copy, Check, Volume2, VolumeX } from 'lucide-react';
 
 export function MasterView({ onBack }: { onBack: () => void }) {
   const [peerId, setPeerId] = useState<string | null>(null);
@@ -10,9 +10,19 @@ export function MasterView({ onBack }: { onBack: () => void }) {
   const [bpm, setBpm] = useState(120);
   const [isPlaying, setIsPlaying] = useState(false);
   const [masterT0, setMasterT0] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [volume, setVolume] = useState(1.0);
+  const [isMuted, setIsMuted] = useState(false);
   
   const syncRef = useRef<SyncEngine | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.setVolume(volume);
+      audioRef.current.setMuted(isMuted);
+    }
+  }, [volume, isMuted]);
 
   useEffect(() => {
     const sync = new SyncEngine();
@@ -94,9 +104,50 @@ export function MasterView({ onBack }: { onBack: () => void }) {
           
           <div className="bg-black/30 rounded-xl p-4 text-center">
             <p className="text-gray-400 text-sm mb-1">Your Connect ID</p>
-            <p className="font-mono text-xl tracking-wider text-cyan-300 font-bold select-all">
-              {peerId || 'Generating...'}
-            </p>
+            <div className="flex items-center justify-center gap-3">
+              <p className="font-mono text-xl tracking-wider text-cyan-300 font-bold select-all">
+                {peerId || 'Generating...'}
+              </p>
+              {peerId && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(peerId);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-gray-400 hover:text-white"
+                  title="Copy ID"
+                >
+                  {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="glass rounded-3xl p-6 mb-6">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4 text-center">
+            Master Volume
+          </h3>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsMuted(!isMuted)}
+              className={`p-2 rounded-lg transition-colors ${isMuted ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+            <input 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.01"
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                setVolume(parseFloat(e.target.value));
+                if (isMuted && parseFloat(e.target.value) > 0) setIsMuted(false);
+              }}
+              className="w-full accent-cyan-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+            />
           </div>
         </div>
 
