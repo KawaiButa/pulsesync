@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/components/ClientView.tsx","./src/components/MasterView.tsx","./src/lib/AudioEngine.ts","./src/lib/SyncEngine.ts"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/main.tsx","./src/components/BeatVisualizer.tsx","./src/components/ClientView.tsx","./src/components/MasterView.tsx","./src/lib/AudioEngine.ts","./src/lib/SyncEngine.ts"],"version":"5.9.3"}

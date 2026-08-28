@@ -113,7 +113,8 @@ export class AudioEngine {
     const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
     const manualOffsetSec = this.manualOffset / 1000.0;
     const playTime = time - latency + manualOffsetSec; // shift schedule slightly based on latency and manual offset
-    const safePlayTime = playTime > 0 ? playTime : 0;
+    const now = this.ctx.currentTime;
+    const safePlayTime = playTime > now ? playTime : now;
     
     // Envelope to make a percussive "click"
     gainNode.gain.setValueAtTime(0, safePlayTime);
@@ -127,7 +128,10 @@ export class AudioEngine {
   private scheduler = () => {
     // While there are notes that will need to play before the next interval,
     // schedule them and advance the pointer.
-    while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
+    const latency = (this.ctx.baseLatency || 0) + (this.ctx.outputLatency || 0);
+    const manualOffsetSec = this.manualOffset / 1000.0;
+    
+    while (this.nextNoteTime - latency + manualOffsetSec < this.ctx.currentTime + this.scheduleAheadTime) {
       this.scheduleNote(this.currentBeat, this.nextNoteTime);
       this.nextNote();
     }
