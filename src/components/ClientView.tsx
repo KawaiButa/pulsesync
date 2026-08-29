@@ -20,8 +20,9 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   const audioRef = useRef<AudioEngine | null>(null);
   const hasAudioContext = useRef(false);
   
+  const [tapCount, setTapCount] = useState(0);
   const tapHistoryRef = useRef<number[]>([]);
-  const lastTapTimeRef = useRef<number>(0);
+  const tapTimerRef = useRef<number | null>(null);
 
   // Auto-init audio context on user interaction
   const initAudio = () => {
@@ -69,6 +70,7 @@ export function ClientView({ onBack }: { onBack: () => void }) {
 
     return () => {
       audio.stop();
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
     };
   }, []);
 
@@ -83,13 +85,6 @@ export function ClientView({ onBack }: { onBack: () => void }) {
   const handleTapToSync = () => {
     if (!syncState || !syncRef.current) return;
     
-    const now = performance.now();
-    if (now - lastTapTimeRef.current > 2000) {
-      // More than 2 seconds since last tap, reset history
-      tapHistoryRef.current = [];
-    }
-    lastTapTimeRef.current = now;
-
     const syncTime = syncRef.current.getSynchronizedTime();
     const msPerBeat = (60.0 / syncState.bpm) * 1000;
     const elapsed = syncTime - syncState.masterT0;
@@ -99,16 +94,26 @@ export function ClientView({ onBack }: { onBack: () => void }) {
     const delta = syncTime - idealBeatTime;
     
     tapHistoryRef.current.push(delta);
-    if (tapHistoryRef.current.length > 8) {
-      tapHistoryRef.current.shift(); // keep last 8 taps
+    setTapCount(tapHistoryRef.current.length);
+    
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
     }
     
-    // Calculate average
-    const avgDelta = tapHistoryRef.current.reduce((a, b) => a + b, 0) / tapHistoryRef.current.length;
-    
-    // Update offset (clamp to -500 to 500)
-    const newOffset = Math.max(-500, Math.min(500, Math.round(avgDelta)));
-    setManualOffset(newOffset);
+    tapTimerRef.current = window.setTimeout(() => {
+      if (tapHistoryRef.current.length > 0) {
+        // Calculate average of all collected taps in this continuous session
+        const avgDelta = tapHistoryRef.current.reduce((a, b) => a + b, 0) / tapHistoryRef.current.length;
+        
+        // Update offset (clamp to -500 to 500)
+        const newOffset = Math.max(-500, Math.min(500, Math.round(avgDelta)));
+        setManualOffset(newOffset);
+        
+        // Reset state
+        tapHistoryRef.current = [];
+        setTapCount(0);
+      }
+    }, 1500); // Apply offset 1.5s after the user stops tapping
   };
 
   return (
@@ -188,10 +193,10 @@ export function ClientView({ onBack }: { onBack: () => void }) {
               
               <button
                 onClick={handleTapToSync}
-                className="w-full bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-xl py-3 font-bold mb-6 transition-all flex items-center justify-center active:scale-95 shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+                className={`w-full ${tapCount > 0 ? 'bg-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30'} rounded-xl py-3 font-bold mb-6 transition-all flex items-center justify-center active:scale-95`}
               >
                 <MousePointerClick className="w-5 h-5 mr-2" />
-                Tap to Sync with Master
+                {tapCount > 0 ? `Recording taps... (${tapCount})` : 'Tap to Sync with Master'}
               </button>
 
               <div className="flex items-center justify-between mb-2">
